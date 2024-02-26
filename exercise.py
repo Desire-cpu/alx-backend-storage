@@ -10,7 +10,7 @@ from functools import wraps
 '''
 
 
-def increment_calls(method: Callable) -> Callable:
+def count_calls(method: Callable) -> Callable:
     '''
         Counts the number of times a method is called.
     '''
@@ -26,26 +26,26 @@ def increment_calls(method: Callable) -> Callable:
     return wrapper
 
 
-def log_call_history(method: Callable) -> Callable:
+def call_history(method: Callable) -> Callable:
     """ Decorator to store the history of inputs and
     outputs for a particular function.
     """
     key = method.__qualname__
-    inputs_key = key + ":inputs"
-    outputs_key = key + ":outputs"
+    inputs = key + ":inputs"
+    outputs = key + ":outputs"
 
     @wraps(method)
     def wrapper(self, *args, **kwargs):  # sourcery skip: avoid-builtin-shadow
         """ Wrapper for decorator functionality """
-        self._redis.rpush(inputs_key, str(args))
+        self._redis.rpush(inputs, str(args))
         data = method(self, *args, **kwargs)
-        self._redis.rpush(outputs_key, str(data))
+        self._redis.rpush(outputs, str(data))
         return data
 
     return wrapper
 
 
-def replay_history(method: Callable) -> None:
+def replay(method: Callable) -> None:
     # sourcery skip: use-fstring-for-concatenation, use-fstring-for-formatting
     """
     Replays the history of a function
@@ -76,15 +76,15 @@ class Cache:
         self._redis = redis.Redis()
         self._redis.flushdb()
 
-    @increment_calls
-    @log_call_history
+    @count_calls
+    @call_history
     def store(self, data: Union[str, bytes, int, float]) -> str:
         '''
             Store data in the cache.
         '''
-        random_key = str(uuid4())
-        self._redis.set(random_key, data)
-        return random_key
+        randomKey = str(uuid4())
+        self._redis.set(randomKey, data)
+        return randomKey
 
     def get(self, key: str,
             fn: Optional[Callable] = None) -> Union[str, bytes, int, float]:
