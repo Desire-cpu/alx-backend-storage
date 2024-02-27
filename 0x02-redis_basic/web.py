@@ -1,32 +1,38 @@
 #!/usr/bin/env python3
-""" Redis Caching Module """
-
-from functools import wraps
+'''A module with tools for request caching and tracking.
+'''
 import redis
 import requests
+from functools import wraps
 from typing import Callable
 
-redis_cache = redis.Redis()
+
+redis_store = redis.Redis()
+'''The module-level Redis instance.
+'''
 
 
-def request_counter_decorator(method: Callable) -> Callable:
-    """ Decorator for counting requests """
+def data_cacher(method: Callable) -> Callable:
+    '''Caches the output of fetched data.
+    '''
     @wraps(method)
-    def decorated_function(url):  # sourcery skip: use-named-expression
-        """ Wrapper function for the decorator """
-        redis_cache.incr(f"request_count:{url}")
-        cached_html = redis_cache.get(f"cached_html:{url}")
-        if cached_html:
-            return cached_html.decode('utf-8')
-        html_content = method(url)
-        redis_cache.setex(f"cached_html:{url}", 10, html_content)
-        return html_content
+    def invoker(url) -> str:
+        '''The wrapper function for caching the output.
+        '''
+        redis_store.incr(f'count:{url}')
+        result = redis_store.get(f'result:{url}')
+        if result:
+            return result.decode('utf-8')
+        result = method(url)
+        redis_store.set(f'count:{url}', 0)
+        redis_store.setex(f'result:{url}', 10, result)
+        return result
+    return invoker
 
-    return decorated_function
 
-
-@request_counter_decorator
-def fetch_html_content(url: str) -> str:
-    """ Obtain the HTML content of a URL """
-    request = requests.get(url)
-    return request.text
+@data_cacher
+def get_page(url: str) -> str:
+    '''Returns the content of a URL after caching the request's response,
+    and tracking the request.
+    '''
+    return requests.get(url).text
